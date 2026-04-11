@@ -1,0 +1,78 @@
+services:
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      OTEL_SERVICE_NAME: catalog-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "3000:3000"
+    depends_on:
+      - otel-collector
+
+  orders-service:
+    build:
+      context: ./services/orders-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      OTEL_SERVICE_NAME: orders-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      CATALOG_SERVICE_BASE_URL: http://catalog-service:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - catalog-service
+      - otel-collector
+
+  prometheus:
+    image: prom/prometheus:v3.7.2
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - catalog-service
+      - orders-service
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - tempo
+
+  tempo:
+    image: grafana/tempo:2.8.1
+    command:
+      - "-config.file=/etc/tempo/config.yml"
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./monitoring/tempo/tempo.yml:/etc/tempo/config.yml:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.140.1
+    command:
+      - "--config=/etc/otel-collector/config.yml"
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    volumes:
+      - ./monitoring/otel-collector/config.yml:/etc/otel-collector/config.yml:ro
+    depends_on:
+      - tempo
+

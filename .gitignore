@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+bin/
+obj/
+.DS_Store
+.env
+.idea/
+.vscode/
+TestResults/
+

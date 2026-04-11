@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders-service
+  template:
+    metadata:
+      labels:
+        app: orders-service
+    spec:
+      containers:
+        - name: orders-service
+          image: ghcr.io/example/orders-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+            - name: OTEL_SERVICE_NAME
+              value: orders-service
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4317
+            - name: CATALOG_SERVICE_BASE_URL
+              value: http://catalog-service:3000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-service
+spec:
+  selector:
+    app: orders-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+
